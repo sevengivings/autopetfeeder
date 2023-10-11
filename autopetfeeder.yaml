@@ -164,9 +164,7 @@ cover:
       - lambda: |- 
           auto call2 = id(my_fan).turn_off();
           call2.perform(); 
-      - deep_sleep.enter:
-          id: deep_sleep_1
-          sleep_duration: 60min   
+      - deep_sleep.allow: deep_sleep_1 
 
 button:
   - platform: template
