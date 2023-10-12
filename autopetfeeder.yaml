@@ -32,14 +32,18 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Autopetfeeder Fallback Hotspot"
-    password: ""
+    password: "GENERATED_BY_ESPHOME"
 
 captive_portal:
     
 deep_sleep:
   id: deep_sleep_1
-  run_duration: 120s
-  sleep_duration: 60min  # 10 hours 
+  run_duration: 
+    default: 120s
+    gpio_wakeup_reason: 30s
+  wakeup_pin_mode: 
+    KEEP_AWAKE 
+  sleep_duration: 1440min  # cannot omit 
   wakeup_pin: GPIO4
   #wakeup_pin_mode: INVERT_WAKEUP
 
@@ -47,9 +51,13 @@ sensor:
   - platform: ultrasonic
     trigger_pin: GPIO3
     echo_pin: GPIO5
-    update_interval: 5s
+    update_interval: 3s
     name: "Ultrasonic Sensor"
     id: distance
+    timeout: 4m
+    force_update: false
+    filters:
+      lambda: if (isnan(x)) { return 999.0; } return x;
   - platform: homeassistant 
     entity_id: sensor.autopetfeeder_ultrasonic_sensor
     id: ultrasonic_distance
@@ -87,27 +95,30 @@ globals:
 - id: cover_nomovement_count 
   type: int 
   initial_value: "0" 
+- id: cover_status
+  type: int 
+  initial_value: "0"
 
 interval:
   - interval: 1s
     then: 
       - lambda: |-
-          static bool feeder_open = false; 
-          if(id(ultrasonic_distance).state < 0.5 && !feeder_open) {
+          if(id(distance).state < 0.8 && id(cover_status) == 0) {
             id(my_cover).open(); 
-            feeder_open = true; 
+            id(cover_status) = 1; 
             id(cover_nomovement_count) = 0; 
           } else {
-            if(id(ultrasonic_distance).state >= 0.5 && feeder_open) {
+            if(id(distance).state >= 0.8 && id(cover_status) == 1) {
               id(cover_nomovement_count) = id(cover_nomovement_count) + 1; 
               ESP_LOGD("lambda", "nomovement %d", id(cover_nomovement_count));  
             } else { 
               id(cover_nomovement_count) = 0;
             }
             
-            if(id(cover_nomovement_count) > 30) {
+            if(id(cover_nomovement_count) > 45) {
+              id(cover_nomovement_count) = 0;
+              id(cover_status) = 0;               
               id(my_cover).close(); 
-              feeder_open = false; 
             }
           }
           
@@ -150,11 +161,13 @@ cover:
           auto call1 = id(my_fan).turn_on();
           id(my_fan).direction = FanDirection::FORWARD; 
           call1.perform();
-      - delay: 0.11s 
+      - delay: 0.13s 
       - lambda: |- 
           auto call2 = id(my_fan).turn_off();
           call2.perform(); 
-      - deep_sleep.prevent: deep_sleep_1
+          id(cover_status) = 1;
+      - deep_sleep.prevent: 
+          id: deep_sleep_1
     close_action: 
       - lambda: |- 
           auto call1 = id(my_fan).turn_on();
@@ -164,7 +177,9 @@ cover:
       - lambda: |- 
           auto call2 = id(my_fan).turn_off();
           call2.perform(); 
-      - deep_sleep.allow: deep_sleep_1 
+          id(cover_status) = 0;
+      - deep_sleep.enter: 
+          id: deep_sleep_1  
 
 button:
   - platform: template
@@ -172,12 +187,7 @@ button:
     id: sleep_button
     on_press: 
       then:
-        - deep_sleep.enter:
-            id: deep_sleep_1
-            sleep_duration: 60min        
-  - platform: template
-    name: autopetfeeder_sleepprevent
-    id: sleep_prevent_button
-    on_press: 
-      then:
-        - deep_sleep.prevent: deep_sleep_1
+        - lambda: |- 
+            if(id(cover_status) == 1) { 
+              id(my_cover).close(); 
+            }      
