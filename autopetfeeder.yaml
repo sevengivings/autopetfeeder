@@ -47,82 +47,79 @@ deep_sleep:
   wakeup_pin: GPIO4
   #wakeup_pin_mode: INVERT_WAKEUP
 
+globals:
+- id: cover_nomovement_count 
+  type: int 
+  initial_value: "0" 
+- id: cover_movement_count
+  type: int 
+  initial_value: "0" 
+- id: cover_status
+  type: int 
+  initial_value: "0"   
+
 sensor:
   - platform: ultrasonic
     trigger_pin: GPIO3
     echo_pin: GPIO5
-    update_interval: 3s
+    update_interval: 1s
     name: "Ultrasonic Sensor"
-    id: distance
-    timeout: 4m
-    force_update: false
-    filters:
-      lambda: if (isnan(x)) { return 999.0; } return x;
-  - platform: homeassistant 
-    entity_id: sensor.autopetfeeder_ultrasonic_sensor
     id: ultrasonic_distance
-    internal: true   
+    timeout: 4m
+    force_update: true
+    filters: 
+      - lambda: |- 
+          if (isnan(x)) { return 4.0; } return x; 
+    on_value:
+      - lambda: |-
+          if(x < 0.85) {
+            if(id(cover_status) == 0) {
+              id(cover_status) = 1;
+              id(my_cover).open();   
+            } 
+          } else {
+            // 45 times detection
+            id(cover_nomovement_count) += 1;  
+            ESP_LOGD("lambda", "count %d", id(cover_nomovement_count));  
+            if(id(cover_nomovement_count) > 44) {
+              id(cover_nomovement_count) = 0;      
+              // cover is open 
+              if(id(cover_status) == 1) {
+                id(cover_status) = 0;    
+                id(my_cover).close();            
+              }          
+            }
+          }
+  - platform: template 
+    name: "nomovement count"
+    lambda: |- 
+      return id(cover_nomovement_count); 
+    update_interval: 1s
   - platform: adc
     pin: GPIO2 # D0 
     name: "autopetfeeder"
     raw: true 
     attenuation: 11dB
-    update_interval: 10s    
+    update_interval: 2s    
     filters:
       - multiply: 0.0014652014652015  
-#      - sliding_window_moving_average:
-#          window_size: 60
-#          send_every: 60
+      - sliding_window_moving_average:
+          window_size: 12
+          send_every: 12
 
 binary_sensor:
   - platform: gpio
     pin: GPIO4
     name: "PIR Sensor"
-    device_class: motion
-
-#display:
-#    platform: tm1637
-#    id: tm1637_display
-#    clk_pin: GPIO7
-#    dio_pin: GPIO6
-#    inverted: false
-#    intensity: 2
-#    length: 4
-#    lambda: |-
-#      it.printf(0,"%03.2f", id(ultrasonic_distance).state);
-
-globals:
-- id: cover_nomovement_count 
-  type: int 
-  initial_value: "0" 
-- id: cover_status
-  type: int 
-  initial_value: "0"
-
-interval:
-  - interval: 1s
-    then: 
-      - lambda: |-
-          if(id(distance).state < 0.8 && id(cover_status) == 0) {
-            id(my_cover).open(); 
-            id(cover_status) = 1; 
-            id(cover_nomovement_count) = 0; 
-          } else {
-            if(id(distance).state >= 0.8 && id(cover_status) == 1) {
-              id(cover_nomovement_count) = id(cover_nomovement_count) + 1; 
-              ESP_LOGD("lambda", "nomovement %d", id(cover_nomovement_count));  
-            } else { 
-              id(cover_nomovement_count) = 0;
-            }
-            
-            if(id(cover_nomovement_count) > 45) {
-              id(cover_nomovement_count) = 0;
-              id(cover_status) = 0;               
-              id(my_cover).close(); 
-            }
-          }
-          
-
+    device_class: motion    
+  - platform: template 
+    name: "cover status"
+    lambda: |- 
+      if(id(cover_status) == 0) {
+        return false; 
+      } else {
+        return true; 
+      }
 output:
   - platform: ledc
     id: motor_forward_pin
@@ -161,7 +158,7 @@ cover:
           auto call1 = id(my_fan).turn_on();
           id(my_fan).direction = FanDirection::FORWARD; 
           call1.perform();
-      - delay: 0.13s 
+      - delay: 0.15s 
       - lambda: |- 
           auto call2 = id(my_fan).turn_off();
           call2.perform(); 
@@ -173,7 +170,7 @@ cover:
           auto call1 = id(my_fan).turn_on();
           id(my_fan).direction = FanDirection::REVERSE; 
           call1.perform();
-      - delay: 0.05s 
+      - delay: 0.1s 
       - lambda: |- 
           auto call2 = id(my_fan).turn_off();
           call2.perform(); 
@@ -190,4 +187,4 @@ button:
         - lambda: |- 
             if(id(cover_status) == 1) { 
               id(my_cover).close(); 
-            }      
+            }       
