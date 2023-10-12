@@ -42,7 +42,7 @@ deep_sleep:
     default: 120s
     gpio_wakeup_reason: 30s
   wakeup_pin_mode: 
-    KEEP_AWAKE 
+    IGNORE 
   sleep_duration: 1440min  # cannot omit 
   wakeup_pin: GPIO4
   #wakeup_pin_mode: INVERT_WAKEUP
@@ -65,28 +65,44 @@ sensor:
     update_interval: 1s
     name: "Ultrasonic Sensor"
     id: ultrasonic_distance
-    timeout: 4m
-    force_update: true
-    filters: 
-      - lambda: |- 
-          if (isnan(x)) { return 4.0; } return x; 
+    timeout: 3m
+    force_update: false
     on_value:
       - lambda: |-
-          if(x < 0.85) {
+          if(isnan(x) || x < 0.1) {
+            ESP_LOGD("lambda", "too close"); 
+          }
+          else if(x < 0.85) {
             if(id(cover_status) == 0) {
-              id(cover_status) = 1;
-              id(my_cover).open();   
+              id(cover_movement_count) += 1;
+
+              if(id(cover_movement_count) > 2) {
+                id(cover_status) = 1;
+
+                auto call = id(my_cover).make_call();
+                call.set_command_open();
+                call.perform();
+
+                id(cover_movement_count) = 0;
+              }                 
             } 
+
+            id(cover_nomovement_count) = 0; 
           } else {
             // 45 times detection
-            id(cover_nomovement_count) += 1;  
+            id(cover_nomovement_count) += 1;
+            id(cover_movement_count) = 0;
+  
             ESP_LOGD("lambda", "count %d", id(cover_nomovement_count));  
             if(id(cover_nomovement_count) > 44) {
               id(cover_nomovement_count) = 0;      
               // cover is open 
               if(id(cover_status) == 1) {
                 id(cover_status) = 0;    
-                id(my_cover).close();            
+ 
+                auto call = id(my_cover).make_call();
+                call.set_command_close();
+                call.perform();                 
               }          
             }
           }
@@ -95,6 +111,11 @@ sensor:
     lambda: |- 
       return id(cover_nomovement_count); 
     update_interval: 1s
+  - platform: template 
+    name: "movement count"
+    lambda: |- 
+      return id(cover_movement_count); 
+    update_interval: 1s    
   - platform: adc
     pin: GPIO2 # D0 
     name: "autopetfeeder"
@@ -120,6 +141,7 @@ binary_sensor:
       } else {
         return true; 
       }
+
 output:
   - platform: ledc
     id: motor_forward_pin
@@ -174,8 +196,11 @@ cover:
       - lambda: |- 
           auto call2 = id(my_fan).turn_off();
           call2.perform(); 
+
           id(cover_status) = 0;
-      - deep_sleep.enter: 
+          id(cover_nomovement_count) = 0;
+          id(cover_movement_count) = 0;
+      - deep_sleep.allow: 
           id: deep_sleep_1  
 
 button:
@@ -186,5 +211,7 @@ button:
       then:
         - lambda: |- 
             if(id(cover_status) == 1) { 
-              id(my_cover).close(); 
-            }       
+              auto call = id(my_cover).make_call();
+              call.set_command_close();
+              call.perform();   
+            }  
