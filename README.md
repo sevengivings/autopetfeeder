@@ -15,4 +15,8 @@ Automated pet feeder made with ESPHome
 
 ![165230](https://github.com/sevengivings/autopetfeeder/assets/2328500/ed004c01-10b7-4d8b-a099-c494bfea1283)
 
+![134759](https://github.com/sevengivings/autopetfeeder/assets/2328500/7e662bf1-d4e7-47f0-9aee-442b1c3a69e7)
+
+![163358](https://github.com/sevengivings/autopetfeeder/assets/2328500/a262c3d5-37a3-4c62-8f47-96697ee1c642)
+
 https://imky.tistory.com/86 (in Korean)
