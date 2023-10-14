@@ -25,4 +25,5 @@ Traditional passive infrared (PIR) sensors have the problem of opening the lid w
 
 ![163358](https://github.com/sevengivings/autopetfeeder/assets/2328500/a262c3d5-37a3-4c62-8f47-96697ee1c642)
 
-https://imky.tistory.com/86 (in Korean)
+More stories can be found at https://imky.tistory.com/86 (in Korean)
+AMG8833-related codes are originated from https://github.com/TheRealWaldo/AMG8833-ESPHOME
