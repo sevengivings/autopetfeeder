@@ -5,7 +5,7 @@ Automated pet feeder made with ESPHome
 
 The sparrows occasionally come in for a seasonal binge of puppy food, and it makes a mess when the small-mouthed birds dig it up instead of taking a bite out of each one. So, I bought an auto-open feeder from Aliexpress with a proximity sensor, used it for a while, and became dissatisfied with the function (it closed in the middle of eating, startling my dog). 
 
-Traditional passive infrared (PIR) sensors have the problem of opening the lid when sparrows come. For the first time, I used an ultrasonic distance sensor as a baseline for opening and closing. 
+Traditional passive infrared (PIR) sensors have the problem of opening the lid when sparrows come. For the first time, I used an ultrasonic distance sensor as a baseline for opening and closing. But the trouble with the malfunction of the ultrasonic distance sensor(occasionally happened after waking up from deep sleep of ESP32-C3), I chose the infrared thermal sensor(8x8 pixels AMG8833-based sensor). 
 
 ## [1st version - Ultrasonic sensor HC-SR04] 
 
