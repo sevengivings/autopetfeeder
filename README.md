@@ -37,7 +37,11 @@ Traditional passive infrared (PIR) sensors have the problem of opening the lid w
 
 ![163358](https://github.com/sevengivings/autopetfeeder/assets/2328500/a262c3d5-37a3-4c62-8f47-96697ee1c642)
 
-*A min, max, and average of 64 temperature values in the outside environment.* 
+*A minimum, maximum, and average of 64 temperature values in the outside environment.* 
+
+![221040](https://github.com/sevengivings/autopetfeeder/assets/2328500/599f9e89-baa0-40b8-a3c7-063b8c34b30d)
+
+*As we can see in the above chart, we cannot depend on only the MCU8833 sensor. Under sunlight, the difference between max and average increases, and abnormal temperature values appear according to the placement.* 
 
 - More stories can be found at https://imky.tistory.com/86 (in Korean)
 - AMG8833-related codes are originated from https://github.com/TheRealWaldo/AMG8833-ESPHOME
