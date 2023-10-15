@@ -1,5 +1,5 @@
 # autopetfeeder
-Automated pet feeder made with ESPHome 
+Automated pet feeder made with ESPHome under construction.
 
 ## [Introduction] 
 
