@@ -150,7 +150,7 @@ sensor:
         thermal_count--;
       }
 
-      if(thermal_count == 60 && id(cover_status) == 0 && pir_count > 0) { 
+      if(thermal_count == 60 && id(cover_status) == 0) { 
         id(cover_status) = 1;
 
         auto call = id(my_cover).make_call();
