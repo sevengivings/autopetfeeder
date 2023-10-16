@@ -3,7 +3,22 @@ esphome:
   friendly_name: autopetfeeder
   includes:
     - mcu8833.h     
-
+  on_shutdown: 
+    then: 
+      - lambda: |- 
+          if(id(cover_status == 0)) {
+            auto call1 = id(my_fan).turn_on();
+            id(my_fan).direction = FanDirection::FORWARD; 
+            call1.perform();
+          }
+      - delay: 0.15s 
+      - lambda: |- 
+          if(id(cover_status == 0)) {
+            auto call2 = id(my_fan).turn_off();
+            call2.perform(); 
+            id(cover_status) = 1;
+          }
+    
 esp32:
   board: esp32-c3-devkitm-1
   framework:
@@ -16,10 +31,10 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "dV3MA/amgDRNb5V4I4kUuvhqw4EKKNMP01+ZTcPwxx="
+    key: !secret api_password
 
 ota:
-  password: "f53940cfba614eb95e30f3ac2aa8407"
+  password: !secret ota_password 
 
 wifi:
   ssid: !secret wifi_ssid
@@ -35,7 +50,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Autopetfeeder Fallback Hotspot"
-    password: "cLREoSydr2Q"
+    password: !secret hotspot_password
 
 captive_portal:
     
@@ -49,13 +64,18 @@ uart:
 deep_sleep:
   id: deep_sleep_1
   run_duration: 
-    default: 180s
-    gpio_wakeup_reason: 30s
+    default: 60s
+    gpio_wakeup_reason: 15s
   wakeup_pin_mode: 
     IGNORE 
   sleep_duration: 1440min  # cannot omit 
   wakeup_pin: GPIO4
   #wakeup_pin_mode: INVERT_WAKEUP
+
+switch:
+  - platform: shutdown
+    id: shutdown_switch
+    name: "autopetfeeder shutdown"
 
 globals:
 - id: somebody_count
@@ -98,23 +118,39 @@ sensor:
     attenuation: 11dB
     update_interval: 2s    
     filters:
+      - skip_initial: 3
+      - delta: 0.2
       - multiply: 0.0014652014652015  
       - sliding_window_moving_average:
           window_size: 12
           send_every: 12
+    on_value_range:
+      - below: 3.4
+        then: 
+          - switch.turn_on: shutdown_switch      
   - platform: template 
     name: "coveropen timeout"
     lambda: |-
-      static long count = 0;  
+      static long thermal_count = 0;  
+      static long pir_count = 0; 
 
-      // magic number 7 should be changed for each environment
-      if(id(thermal_max).state - id(thermal_avg).state > 7) {
-        count = 60;
+      if(id(pir_sensor).state == 1) {
+        pir_count = 60; 
       } else {
-        count--;
+        pir_count--; 
       }
 
-      if(count == 60 && id(cover_status) == 0) { 
+      ESP_LOGD("lambda", "pir count %d", pir_count);  
+
+      // all magic number should be changed for each environment. 
+      // body temperature > 19°C and maximum - average temperature > 6°C and movement within 30 seconds 
+      if(id(thermal_max).state > 19 && id(thermal_max).state - id(thermal_avg).state > 6 && pir_count > 30) {
+        thermal_count = 60;
+      } else {
+        thermal_count--;
+      }
+
+      if(thermal_count == 60 && id(cover_status) == 0 && pir_count > 0) { 
         id(cover_status) = 1;
 
         auto call = id(my_cover).make_call();
@@ -122,7 +158,7 @@ sensor:
         call.perform();        
       }
 
-      if(count == 0 && id(cover_status) == 1) { 
+      if((thermal_count == 0 || pir_count < 0) && id(cover_status) == 1) { 
         id(cover_status) = 0;    
 
         auto call = id(my_cover).make_call();
@@ -130,14 +166,15 @@ sensor:
         call.perform(); 
       }
 
-      return count; 
+      return thermal_count; 
     update_interval: 1s 
 
 binary_sensor:
   - platform: gpio
     pin: GPIO4
     name: "PIR Sensor"
-    device_class: motion    
+    id: pir_sensor 
+    device_class: motion          
   - platform: template 
     name: "cover status"
     lambda: |- 
